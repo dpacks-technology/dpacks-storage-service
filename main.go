@@ -19,15 +19,15 @@ var (
 )
 
 //const (
-//	host     = "34.93.42.56"
+//	host     = ""
 //	port     = 5432
-//	user     = "dp-user"
-//	password = "RbATkbOB4t"
-//	dbname   = "dp_db"
+//	user     = ""
+//	password = ""
+//	dbname   = ""
 //)
 
 //const (
-//	SecretKey = "2bneFLb2o38rygTf182TRHl3or7g2l4WEfh248yhl2oGE34h2luj9f7gp13p12E3ADWrf3CW4rEF3uht38u4j"
+//	SecretKey = ""
 //)
 
 //func ValidateJWT() gin.HandlerFunc {
@@ -69,7 +69,7 @@ func main() {
 
 	// CORS middleware configuration
 	config := cors.DefaultConfig()
-	config.AllowOrigins = []string{"http://localhost:3000", "http://localhost:3001", "http://localhost:4000", "http://localhost:4001", "http://localhost:4002"}
+	config.AllowOrigins = []string{"*"}
 	config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE"}
 	config.AllowHeaders = []string{"Origin", "Content-Length", "Content-Type", "Authorization"}
 
