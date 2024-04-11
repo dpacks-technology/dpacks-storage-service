@@ -25,4 +25,4 @@ jobs:
             sudo docker stop dpacks-storage-service
             sudo docker rm dpacks-storage-service
             sudo docker build -t dpacks-storage-service:latest .
-            sudo docker run -d --name dpacks-storage-service -p 4010:4010 dpacks-storage-service:latest"
+            sudo docker run -d --name dpacks-storage-service -p 4004:4004 dpacks-storage-service:latest"

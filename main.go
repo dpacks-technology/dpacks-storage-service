@@ -85,7 +85,7 @@ func main() {
 	// File delete endpoint
 	//r.DELETE("/delete/:filename", ValidateJWT(), removeFile)
 
-	r.Run(":4002")
+	r.Run(":4004")
 }
 
 // Function to connect to the database
