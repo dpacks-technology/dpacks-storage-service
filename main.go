@@ -14,20 +14,21 @@ import (
 )
 
 var (
-	credentials = "./Keys/dpacks-3e038-9865a5b29f91.json"
-	bucketName  = "dpacks-3e038.appspot.com"
+	credentials          = "./Keys/dpacks-3e038-9865a5b29f91.json"
+	templatesCredentials = "./Keys/dpacks-templates-1cbc74a74ffe.json"
+	bucketName           = "dpacks-3e038.appspot.com"
 )
 
 //const (
-//	host     = "34.93.42.56"
+//	host     = ""
 //	port     = 5432
-//	user     = "dp-user"
-//	password = "RbATkbOB4t"
-//	dbname   = "dp_db"
+//	user     = ""
+//	password = ""
+//	dbname   = ""
 //)
 
 //const (
-//	SecretKey = "2bneFLb2o38rygTf182TRHl3or7g2l4WEfh248yhl2oGE34h2luj9f7gp13p12E3ADWrf3CW4rEF3uht38u4j"
+//	SecretKey = ""
 //)
 
 //func ValidateJWT() gin.HandlerFunc {
@@ -69,7 +70,7 @@ func main() {
 
 	// CORS middleware configuration
 	config := cors.DefaultConfig()
-	config.AllowOrigins = []string{"http://localhost:3000", "http://localhost:3001", "http://localhost:4000", "http://localhost:4001", "http://localhost:4002"}
+	config.AllowOrigins = []string{"*"}
 	config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE"}
 	config.AllowHeaders = []string{"Origin", "Content-Length", "Content-Type", "Authorization"}
 
@@ -79,13 +80,16 @@ func main() {
 	r.POST("/write", uploadFile)
 	r.DELETE("/:filename", removeFile)
 
+	r.POST("/template", uploadTemplate)
+	r.DELETE("/template/:filename", removeTemplate)
+
 	// File view endpoint
 	//r.GET("/view/:filename", viewFile)
 
 	// File delete endpoint
 	//r.DELETE("/delete/:filename", ValidateJWT(), removeFile)
 
-	r.Run(":4002")
+	r.Run(":4004")
 }
 
 // Function to connect to the database
@@ -193,6 +197,86 @@ func uploadFile(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "File uploaded successfully", "image": filename})
 }
 
+func uploadTemplate(c *gin.Context) {
+	// Get the user POST data from the Gin context filename as string
+	rawFilename := c.PostForm("filename")
+
+	// make filename as string
+	filename := fmt.Sprintf("%v", rawFilename)
+
+	// Check if the user data exists
+	if filename == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No filename"})
+		return
+	}
+
+	// Limit the maximum file size to 4MB
+	maxSize := int64(5 << 20) // 5MB
+	err := c.Request.ParseMultipartForm(maxSize)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "File size exceeds the limit"})
+		return
+	}
+
+	file, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid file"})
+		return
+	}
+
+	// Validate file type (allow only json)
+	//if !isJSON(file) {
+	//	c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid file type. Only JSON files are allowed"})
+	//	return
+	//}
+
+	// Open the uploaded file
+	src, err := file.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to open file"})
+		return
+	}
+	defer src.Close()
+
+	// Initialize Firebase app
+	opt := option.WithCredentialsFile(templatesCredentials)
+	app, err := firebase.NewApp(context.Background(), nil, opt)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to initialize Firebase app"})
+		return
+	}
+
+	// Create a Firebase Storage client
+	client, err := app.Storage(context.Background())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create Firebase Storage client"})
+		return
+	}
+
+	// Create a Storage bucket reference
+	bucket, err := client.Bucket(bucketName)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create bucket reference"})
+		return
+	}
+
+	// Create an object in the bucket with the specified content type
+	obj := bucket.Object(filename)
+	w := obj.NewWriter(context.Background())
+	w.ContentType = "application/json"
+
+	// Write data to the object
+	if _, err := io.Copy(w, src); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to write file to Firebase Storage"})
+		return
+	}
+	defer w.Close()
+
+	//insertUploadData(1, filename)
+
+	c.JSON(http.StatusOK, gin.H{"message": "File uploaded successfully", "image": filename})
+}
+
 // convertToInteger converts an interface{} to an int
 func convertToInteger(value interface{}) int {
 	var result int
@@ -248,6 +332,58 @@ func removeFile(c *gin.Context) {
 
 	// Initialize Firebase app
 	opt := option.WithCredentialsFile(credentials)
+	app, err := firebase.NewApp(context.Background(), nil, opt)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Create a Firebase Storage client
+	client, err := app.Storage(context.Background())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get the bucket reference
+	bucket, err := client.Bucket(bucketName)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get the object from the bucket
+	obj := bucket.Object(filename)
+	if err := obj.Delete(context.Background()); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "File deleted successfully"})
+}
+
+func removeTemplate(c *gin.Context) {
+	// Get the user data from the Gin context
+	//userIdRaw, exists := c.Get("userid")
+	//if !exists {
+	//	c.JSON(http.StatusInternalServerError, gin.H{"error": "No user data"})
+	//	return
+	//}
+
+	//var user interface{} = userIdRaw
+	//userId := convertToInteger(user)
+
+	// Get the filename from the request
+	filename := c.Param("filename")
+
+	// Check if the user is authorized to delete the file
+	//if !isAuthorizedToDelete(userId, filename) {
+	//	c.JSON(http.StatusForbidden, gin.H{"error": "Unauthorized to delete this file"})
+	//	return
+	//}
+
+	// Initialize Firebase app
+	opt := option.WithCredentialsFile(templatesCredentials)
 	app, err := firebase.NewApp(context.Background(), nil, opt)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
