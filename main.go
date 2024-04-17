@@ -15,8 +15,9 @@ import (
 
 var (
 	credentials          = "./Keys/dpacks-3e038-9865a5b29f91.json"
-	templatesCredentials = "./Keys/dpacks-templates-1cbc74a74ffe.json"
+	templatesCredentials = "./Keys/dpacks-templates-8d4ba56721b1.json"
 	bucketName           = "dpacks-3e038.appspot.com"
+	templateBucketName   = "dpacks-templates.appspot.com"
 )
 
 //const (
@@ -254,7 +255,7 @@ func uploadTemplate(c *gin.Context) {
 	}
 
 	// Create a Storage bucket reference
-	bucket, err := client.Bucket(bucketName)
+	bucket, err := client.Bucket(templateBucketName)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create bucket reference"})
 		return
@@ -398,7 +399,7 @@ func removeTemplate(c *gin.Context) {
 	}
 
 	// Get the bucket reference
-	bucket, err := client.Bucket(bucketName)
+	bucket, err := client.Bucket(templateBucketName)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
