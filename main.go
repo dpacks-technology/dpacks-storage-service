@@ -264,7 +264,9 @@ func uploadTemplate(c *gin.Context) {
 	// Create an object in the bucket with the specified content type
 	obj := bucket.Object(filename)
 	w := obj.NewWriter(context.Background())
-	w.ContentType = "application/json"
+
+	// ContentType zip
+	w.ContentType = "application/zip"
 
 	// Write data to the object
 	if _, err := io.Copy(w, src); err != nil {
