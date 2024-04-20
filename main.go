@@ -84,6 +84,9 @@ func main() {
 	r.POST("/template", uploadTemplate)
 	r.DELETE("/template/:filename", removeTemplate)
 
+	r.POST("/template/image", uploadTemplateThumbnail)
+	r.DELETE("/template/image/:filename", removeTemplateThumbnail)
+
 	// File view endpoint
 	//r.GET("/view/:filename", viewFile)
 
@@ -280,6 +283,85 @@ func uploadTemplate(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "File uploaded successfully", "image": filename})
 }
 
+func uploadTemplateThumbnail(c *gin.Context) {
+	// Get the user POST data from the Gin context filename as string
+	rawFilename := c.PostForm("filename")
+
+	// make filename as string
+	filename := fmt.Sprintf("%v", rawFilename)
+
+	// Check if the user data exists
+	if filename == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No filename"})
+		return
+	}
+
+	// Limit the maximum file size to 4MB
+	maxSize := int64(5 << 20) // 5MB
+	err := c.Request.ParseMultipartForm(maxSize)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "File size exceeds the limit"})
+		return
+	}
+
+	file, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid file"})
+		return
+	}
+
+	// Validate file type (allow only json)
+	//if !isJSON(file) {
+	//	c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid file type. Only JSON files are allowed"})
+	//	return
+	//}
+
+	// Open the uploaded file
+	src, err := file.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to open file"})
+		return
+	}
+	defer src.Close()
+
+	// Initialize Firebase app
+	opt := option.WithCredentialsFile(templatesCredentials)
+	app, err := firebase.NewApp(context.Background(), nil, opt)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to initialize Firebase app"})
+		return
+	}
+
+	// Create a Firebase Storage client
+	client, err := app.Storage(context.Background())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create Firebase Storage client"})
+		return
+	}
+
+	// Create a Storage bucket reference
+	bucket, err := client.Bucket(templateBucketName)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create bucket reference"})
+		return
+	}
+
+	// Create an object in the bucket with the specified content type
+	obj := bucket.Object(filename)
+	w := obj.NewWriter(context.Background())
+
+	// Write data to the object
+	if _, err := io.Copy(w, src); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to write file to Firebase Storage"})
+		return
+	}
+	defer w.Close()
+
+	//insertUploadData(1, filename)
+
+	c.JSON(http.StatusOK, gin.H{"message": "File uploaded successfully", "image": filename})
+}
+
 // convertToInteger converts an interface{} to an int
 func convertToInteger(value interface{}) int {
 	var result int
@@ -366,6 +448,58 @@ func removeFile(c *gin.Context) {
 }
 
 func removeTemplate(c *gin.Context) {
+	// Get the user data from the Gin context
+	//userIdRaw, exists := c.Get("userid")
+	//if !exists {
+	//	c.JSON(http.StatusInternalServerError, gin.H{"error": "No user data"})
+	//	return
+	//}
+
+	//var user interface{} = userIdRaw
+	//userId := convertToInteger(user)
+
+	// Get the filename from the request
+	filename := c.Param("filename")
+
+	// Check if the user is authorized to delete the file
+	//if !isAuthorizedToDelete(userId, filename) {
+	//	c.JSON(http.StatusForbidden, gin.H{"error": "Unauthorized to delete this file"})
+	//	return
+	//}
+
+	// Initialize Firebase app
+	opt := option.WithCredentialsFile(templatesCredentials)
+	app, err := firebase.NewApp(context.Background(), nil, opt)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Create a Firebase Storage client
+	client, err := app.Storage(context.Background())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get the bucket reference
+	bucket, err := client.Bucket(templateBucketName)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get the object from the bucket
+	obj := bucket.Object(filename)
+	if err := obj.Delete(context.Background()); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "File deleted successfully"})
+}
+
+func removeTemplateThumbnail(c *gin.Context) {
 	// Get the user data from the Gin context
 	//userIdRaw, exists := c.Get("userid")
 	//if !exists {
